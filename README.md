@@ -1,4 +1,2 @@
 # photoshopbattles-screensaver
-A /r/photoshopbattles subreddit screensaver script
-
-Silly python script that simply downloads images from /r/photoshopbattles, because I think they would be great for a screensaver.
+Downloads funny images from /r/photoshopbattles. Next step is to configure your screensaver's slideshow to get images from the folder that's hardcoded in the source.
