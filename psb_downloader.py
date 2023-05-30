@@ -11,8 +11,8 @@ DESTINATION_FOLDER="/home/chaouche/IMAGES/REDDIT/PHOTOSHOPBATTLES/"
 
 # let's create a reddit browser
 reddit=praw.Reddit(user_agent="interactive test from ipython",
-                   client_id="YCqZuFjwVY541akMwbrpIQ",
-                   client_secret="aoZsWbzOF-EEG60IRTY0JwlCnxx-IA")
+                   client_id="xxx",
+                   client_secret="xxx")
 
 # browse to a subreddit
 psbattles=reddit.subreddit("photoshopbattles")
