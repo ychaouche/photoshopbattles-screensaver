@@ -1,41 +1,98 @@
 import praw
 import bs4
-import commands 
+import urllib
+import ssl
+# do not enforce SSL validation
+ssl._create_default_https_context = ssl._create_unverified_context
 
-def get_submissions(subreddit):
-    """ returns a list of submissions from a subreddit  """
-    app = praw.Reddit(user_agent="psbattle-screensaver")
-    url = "http://www.reddit.com/r/"+subreddit
-    return app.get_content(url)
+# do not use ~ in here
+# use real, full path.
+DESTINATION_FOLDER="/home/chaouche/IMAGES/REDDIT/PHOTOSHOPBATTLES/"
 
-def get_comments(submission):
-    """ returns a list of comments from a thread """
-    return submission.comments
+# let's create a reddit browser
+reddit=praw.Reddit(user_agent="interactive test from ipython",
+                   client_id="YCqZuFjwVY541akMwbrpIQ",
+                   client_secret="aoZsWbzOF-EEG60IRTY0JwlCnxx-IA")
 
-def extract_image(comment):
-    """ returns an img url from a comment """
-    try:
-        return bs4.BeautifulSoup(comment.body_html).findAll("a")[0].get("href")
-    except:
-        print "[DEBUG] no image found in this comment"
-        pass
+# browse to a subreddit
+psbattles=reddit.subreddit("photoshopbattles")
 
-def save_image(image_url,destination):
-    """ downloads the image into a destination folder """
-    commands.getoutput('cd %s && wget -nc %s' % (destination,image_url))
+# get top submissions
+psbattles.topsubs=psbattles.top()
 
-def main():
-    # FIXME
-    destination = "/home/ychaouche/IMAGES/STOCK/PHOTOSHOPBATTLES/"
-    for submission in get_submissions("photoshopbattles"):
-        print "[DEBUG] looking at submission",submission
-        for comment in get_comments(submission)[1:]:
-            print "[DEBUG] getting images from",comment
-            image_url = extract_image(comment)
-            print "[DEBUG] got image_url",image_url
-            if image_url:
-                print "[DEBUG] saving to",destination
-                save_image(image_url,destination)
+# loop through them
+for sub in psbattles.topsubs:
+    print("getting links from submission: %s" % sub.title)
+    commentcount=0
+    # loop through comments
+    for comment in sub.comments:
+        commentcount+=1
 
-if __name__ == "__main__":
-    main()
+        # "MoreComments" is a special comment that doesn't have a body
+        if hasattr(comment,"body") and "https://" in comment.body : 
+            print("found link in comment #%d:%s"%(commentcount,comment.body))
+
+            # Let's extract only the link from the comment,
+            # as html this time,
+            # bs4 will help us with this.
+            comment.soup=bs4.BeautifulSoup(comment.body_html,features="html.parser")
+
+            # oh,
+            # btw,
+            # a comment may have many links
+            for link in comment.soup.find_all("a"):
+
+                # get the href attribute of the a tag
+                comment.soup.link=link.get("href")
+                print("DIRECT LINK:",comment.soup.link)
+                
+                
+                # if it's a media file
+                if any([extension in comment.soup.link for extension in (".jpg",".jpeg",".png",".gif",".mp4",".webp",".webm")]):
+
+                    # save this for later download
+                    imglink = comment.soup.link
+                    print("IMAGE LINK:",imglink)
+                    # parse the url
+                    # get the part after the last "/"
+                    imgfile=urllib.parse.urlparse(comment.soup.link).path.split("/")[-1]
+
+                    # download to DESTINATION_FOLDER/filename
+                    # DESTINATION_FOLDER already has a trailing "/"
+                    
+                    try:
+                        urllib.request.urlretrieve(imglink,DESTINATION_FOLDER+imgfile)
+                        print("saved to :", DESTINATION_FOLDER+imgfile)
+                    except urllib.error.HTTPError as e :
+                        print("there was an error with this url")
+                        print("skipping")
+
+                # if it's an imgur album or gallery entry
+                elif "imgur.com/" in comment.soup.link:
+
+                    # then grab its HTML 
+                    soup=bs4.BeautifulSoup(urllib.request.urlopen(comment.soup.link).read(),features="html.parser")
+                    # and find the direct image links in there
+                    images=soup.head("meta",attrs={"name":"twitter:image"})                    
+                    for image in images:
+                        imglink = image.get("content")
+                        print("IMAGE LINK <from gallery or album>:",imglink)                        
+                        imgfile = urllib.parse.urlparse(imglink).path.split("/")[-1]
+                        # download to DESTINATION_FOLDER/filename
+                        # DESTINATION_FOLDER already has a trailing "/"                        
+                        try:
+                            urllib.request.urlretrieve(imglink,DESTINATION_FOLDER+imgfile)
+                            print("saved to :", DESTINATION_FOLDER+imgfile)
+                        except urllib.error.HTTPError as e:
+                            print("there was an error with this url")
+                            print("skipping")
+                            
+
+
+                # if it's neither a direct image link
+                # nor an imgur link
+                # we simply ignore it
+                else:
+                    print("probably not an image link")
+                    print("Ignoring")
+                    
